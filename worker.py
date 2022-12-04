@@ -1276,7 +1276,7 @@ class Worker(threading.Thread):
         """Help menu. Allows the user to ask for assistance, get a guide or see some info about the bot."""
         log.debug("Displaying __help_menu")
         # Create a keyboard with the user help menu
-        keyboard =  [telegram.KeyboardButton(self.loc.get("menu_cancel"))]]
+        keyboard =  [telegram.KeyboardButton(self.loc.get("menu_cancel"))
         # Send the previously created keyboard to the user (ensuring it can be clicked only 1 time)
         self.bot.send_message(self.chat.id,
                               self.loc.get("conversation_open_help_menu"),
