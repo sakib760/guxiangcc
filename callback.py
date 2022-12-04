@@ -1,5 +1,4 @@
 import sys
-import telegram
 import configloader
 import flask
 import duckbot
