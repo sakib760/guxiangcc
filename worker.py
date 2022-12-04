@@ -456,7 +456,8 @@ class Worker(threading.Thread):
                         [telegram.KeyboardButton(self.loc.get("menu_order_status"))],
                         [telegram.KeyboardButton(self.loc.get("menu_add_credit"))],
                         [telegram.KeyboardButton(self.loc.get("menu_language"))],
-                        [telegram.KeyboardButton(self.loc.get("menu_help"))]]
+                        [telegram.KeyboardButton(self.loc.get("menu_help")),
+                         telegram.KeyboardButton(self.loc.get("menu_bot_info"))]]
             # Send the previously created keyboard to the user (ensuring it can be clicked only 1 time)
             self.bot.send_message(self.chat.id,
                                   self.loc.get("conversation_open_user_menu",
@@ -469,6 +470,7 @@ class Worker(threading.Thread):
                 self.loc.get("menu_add_credit"),
                 self.loc.get("menu_language"),
                 self.loc.get("menu_help"),
+                self.loc.get("menu_bot_info"),
             ])
             # After the user reply, update the user data
             self.update_user()
@@ -756,6 +758,9 @@ class Worker(threading.Thread):
         # Add the supported payment methods to the keyboard
         # Cash
         keyboard.append([telegram.KeyboardButton(self.loc.get("menu_cash"))])
+        # Telegram Payments
+        if self.cfg["Payments"]["CreditCard"]["credit_card_token"] != "":
+            keyboard.append([telegram.KeyboardButton(self.loc.get("menu_credit_card"))])
         # Bitcoin Payments
         if self.cfg["Bitcoin"]["api_key"] != "":
             keyboard.append([telegram.KeyboardButton("🛡 Bitcoin")])
@@ -773,6 +778,10 @@ class Worker(threading.Thread):
             # Go to the pay with cash function
             self.bot.send_message(self.chat.id,
                                   self.loc.get("payment_cash", user_cash_id=self.user.identifiable_str()))
+        # If the user has selected the Credit Card option...
+        elif selection == self.loc.get("menu_credit_card"):
+            # Go to the pay with credit card function
+            self.__add_credit_cc()
         # If the user has selected the Bitcoin option...
         elif selection == "🛡 Bitcoin":
             # Go to the pay with bitcoin function
@@ -782,6 +791,48 @@ class Worker(threading.Thread):
             # Send him back to the previous menu
             return
 
+    def __add_credit_cc(self):
+        """Add money to the wallet through a credit card payment."""
+        log.debug("Displaying __add_credit_cc")
+        # Create a keyboard to be sent later
+        presets = self.cfg["Payments"]["CreditCard"]["payment_presets"]
+        keyboard = [[telegram.KeyboardButton(str(self.Price(preset)))] for preset in presets]
+        keyboard.append([telegram.KeyboardButton(self.loc.get("menu_cancel"))])
+        # Boolean variable to check if the user has cancelled the action
+        cancelled = False
+        # Loop used to continue asking if there's an error during the input
+        while not cancelled:
+            # Send the message and the keyboard
+            self.bot.send_message(self.chat.id, self.loc.get("payment_cc_amount"),
+                                  reply_markup=telegram.ReplyKeyboardMarkup(keyboard, one_time_keyboard=True))
+            # Wait until a valid amount is sent
+            selection = self.__wait_for_regex(r"([0-9]+(?:[.,][0-9]+)?|" + self.loc.get("menu_cancel") + r")",
+                                              cancellable=True)
+            # If the user cancelled the action
+            if isinstance(selection, CancelSignal):
+                # Exit the loop
+                cancelled = True
+                continue
+            # Convert the amount to an integer
+            value = self.Price(selection)
+            # Ensure the amount is within the range
+            if value > self.Price(self.cfg["Payments"]["CreditCard"]["max_amount"]):
+                self.bot.send_message(self.chat.id,
+                                      self.loc.get("error_payment_amount_over_max",
+                                                   max_amount=self.Price(self.cfg["CreditCard"]["max_amount"])))
+                continue
+            elif value < self.Price(self.cfg["Payments"]["CreditCard"]["min_amount"]):
+                self.bot.send_message(self.chat.id,
+                                      self.loc.get("error_payment_amount_under_min",
+                                                   min_amount=self.Price(self.cfg["CreditCard"]["min_amount"])))
+                continue
+            break
+        # If the user cancelled the action...
+        else:
+            # Exit the function
+            return
+        # Issue the payment invoice
+        self.__make_payment(amount=value)
 
     def __make_payment(self, amount):
         # Set the invoice active invoice payload
@@ -911,7 +962,6 @@ class Worker(threading.Thread):
         # Set the fee to 0 to ensure no accidental discounts are applied
         return 0
 
- 
     def __admin_menu(self):
         """Function called from the run method when the user is an administrator.
         Administrative bot actions should be placed here."""
@@ -1276,14 +1326,14 @@ class Worker(threading.Thread):
         """Help menu. Allows the user to ask for assistance, get a guide or see some info about the bot."""
         log.debug("Displaying __help_menu")
         # Create a keyboard with the user help menu
-        keyboard =  [telegram.KeyboardButton(self.loc.get("menu_cancel"))
+        keyboard = [[telegram.KeyboardButton(self.loc.get("menu_contact_shopkeeper"))],
+                    [telegram.KeyboardButton(self.loc.get("menu_cancel"))]]
         # Send the previously created keyboard to the user (ensuring it can be clicked only 1 time)
         self.bot.send_message(self.chat.id,
                               self.loc.get("conversation_open_help_menu"),
                               reply_markup=telegram.ReplyKeyboardMarkup(keyboard, one_time_keyboard=True))
         # Wait for a reply from the user
         selection = self.__wait_for_specific_message([
-            self.loc.get("menu_guide"),
             self.loc.get("menu_contact_shopkeeper")
         ], cancellable=True)
         # If the user has selected the Order Status option...
