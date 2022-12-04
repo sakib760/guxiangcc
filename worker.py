@@ -1326,7 +1326,8 @@ class Worker(threading.Thread):
         """Help menu. Allows the user to ask for assistance, get a guide or see some info about the bot."""
         log.debug("Displaying __help_menu")
         # Create a keyboard with the user help menu
-        keyboard = [[telegram.KeyboardButton(self.loc.get("menu_contact_shopkeeper"))],
+        keyboard = [[telegram.KeyboardButton(self.loc.get("menu_guide"))],
+                    [telegram.KeyboardButton(self.loc.get("menu_contact_shopkeeper"))],
                     [telegram.KeyboardButton(self.loc.get("menu_cancel"))]]
         # Send the previously created keyboard to the user (ensuring it can be clicked only 1 time)
         self.bot.send_message(self.chat.id,
@@ -1334,8 +1335,13 @@ class Worker(threading.Thread):
                               reply_markup=telegram.ReplyKeyboardMarkup(keyboard, one_time_keyboard=True))
         # Wait for a reply from the user
         selection = self.__wait_for_specific_message([
+            self.loc.get("menu_guide"),
             self.loc.get("menu_contact_shopkeeper")
         ], cancellable=True)
+        # If the user has selected the Guide option...
+        if selection == self.loc.get("menu_guide"):
+            # Send them the bot guide
+            self.bot.send_message(self.chat.id, self.loc.get("help_msg"))
         # If the user has selected the Order Status option...
         elif selection == self.loc.get("menu_contact_shopkeeper"):
             # Find the list of available shopkeepers
